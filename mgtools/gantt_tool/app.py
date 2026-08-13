@@ -25,14 +25,15 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📅 時程甘特圖製作")
+st.title("📅 甘特圖製作工具")
 
 st.write(
     """
     上傳 Excel 後，系統會將每個工作的完成期限顯示在時間軸上。
 
     你可以建立工作之間的連動關係、計算日曆天或工作天、
-    設定休假日，並將完整專案儲存成一份 Excel 檔。
+    設定休假日，並將完整專案儲存成 Excel，
+    或匯出成不需要重新上傳資料的靜態 HTML。
     """
 )
 
@@ -65,11 +66,12 @@ if "loaded_project_name" not in st.session_state:
 
 
 # =========================================================
-# 日期顯示格式
-# 2026-08-13 → 26/8/13
+# 日期格式
 # =========================================================
 def format_date(date):
-
+    """
+    2026-08-13 -> 26/8/13
+    """
     date = pd.Timestamp(date)
 
     return (
@@ -79,12 +81,10 @@ def format_date(date):
     )
 
 
-# =========================================================
-# 月份顯示格式
-# 2026-08 → 26/8
-# =========================================================
 def format_month(date):
-
+    """
+    2026-08 -> 26/8
+    """
     date = pd.Timestamp(date)
 
     return (
@@ -93,12 +93,10 @@ def format_month(date):
     )
 
 
-# =========================================================
-# 短日期格式
-# 2026-08-13 → 8/13
-# =========================================================
 def format_short_date(date):
-
+    """
+    2026-08-13 -> 8/13
+    """
     date = pd.Timestamp(date)
 
     return (
@@ -114,7 +112,6 @@ def calculate_calendar_days(
     start_date,
     end_date
 ):
-
     return (
         end_date - start_date
     ).days + 1
@@ -129,22 +126,27 @@ def calculate_workdays(
     weekmask,
     holidays
 ):
-
     start_np = np.datetime64(
         start_date.date()
     )
 
-    # busday_count 不包含結束日期
-    # 因此加一天，採含頭含尾
     end_np = (
-        np.datetime64(end_date.date())
-        + np.timedelta64(1, "D")
+        np.datetime64(
+            end_date.date()
+        )
+        +
+        np.timedelta64(
+            1,
+            "D"
+        )
     )
 
     holiday_array = np.array(
         [
             np.datetime64(
-                holiday.strftime("%Y-%m-%d")
+                holiday.strftime(
+                    "%Y-%m-%d"
+                )
             )
             for holiday in holidays
         ],
@@ -165,7 +167,6 @@ def calculate_workdays(
 # 建立 weekmask
 # =========================================================
 def create_weekmask(workdays):
-
     keys = [
         "monday",
         "tuesday",
@@ -192,27 +193,23 @@ def create_project_excel(
     day_mode,
     workdays
 ):
-
     output = BytesIO()
 
-    # -----------------------------------------------------
-    # 工作項目
-    # -----------------------------------------------------
     task_export = task_df.copy()
 
-    task_export["完成期限"] = pd.to_datetime(
-        task_export["完成期限"]
+    task_export[
+        "完成期限"
+    ] = pd.to_datetime(
+        task_export[
+            "完成期限"
+        ]
     )
 
-    # -----------------------------------------------------
-    # 連動關係
-    # -----------------------------------------------------
     links_export = pd.DataFrame(
         links
     )
 
     if links_export.empty:
-
         links_export = pd.DataFrame(
             columns=[
                 "start",
@@ -220,22 +217,17 @@ def create_project_excel(
             ]
         )
 
-    # -----------------------------------------------------
-    # 排除日期
-    # Excel 內部仍使用標準日期格式
-    # -----------------------------------------------------
     holidays_export = pd.DataFrame(
         {
             "日期": [
-                holiday.strftime("%Y-%m-%d")
+                holiday.strftime(
+                    "%Y-%m-%d"
+                )
                 for holiday in holidays
             ]
         }
     )
 
-    # -----------------------------------------------------
-    # 系統設定
-    # -----------------------------------------------------
     settings_export = pd.DataFrame(
         {
             "設定": [
@@ -248,7 +240,6 @@ def create_project_excel(
                 "saturday",
                 "sunday"
             ],
-
             "值": [
                 day_mode,
                 workdays["monday"],
@@ -262,9 +253,6 @@ def create_project_excel(
         }
     )
 
-    # -----------------------------------------------------
-    # 寫入 Excel
-    # -----------------------------------------------------
     with pd.ExcelWriter(
         output,
         engine="openpyxl"
@@ -300,23 +288,22 @@ def create_project_excel(
 
 
 # =========================================================
-# 讀取完整專案設定
+# 載入完整專案設定
 # =========================================================
 def load_project_settings(
     uploaded_file,
     task_list
 ):
-
     excel_file = pd.ExcelFile(
         uploaded_file
     )
 
-    sheet_names = excel_file.sheet_names
+    sheet_names = (
+        excel_file.sheet_names
+    )
 
     loaded_links = []
-
     loaded_holidays = []
-
     loaded_day_mode = "日曆天"
 
     loaded_workdays = {
@@ -331,9 +318,8 @@ def load_project_settings(
 
     invalid_links = []
 
-
     # -----------------------------------------------------
-    # 連動關係
+    # 連動
     # -----------------------------------------------------
     if "連動關係" in sheet_names:
 
@@ -360,15 +346,19 @@ def load_project_settings(
                 ):
                     continue
 
-                start_name = str(start_name)
-                end_name = str(end_name)
+                start_name = str(
+                    start_name
+                )
+
+                end_name = str(
+                    end_name
+                )
 
                 if (
                     start_name in task_list
                     and
                     end_name in task_list
                 ):
-
                     loaded_links.append(
                         {
                             "start": start_name,
@@ -377,14 +367,12 @@ def load_project_settings(
                     )
 
                 else:
-
                     invalid_links.append(
                         {
                             "start": start_name,
                             "end": end_name
                         }
                     )
-
 
     # -----------------------------------------------------
     # 排除日期
@@ -398,7 +386,9 @@ def load_project_settings(
 
         if "日期" in holidays_df.columns:
 
-            for value in holidays_df["日期"]:
+            for value in holidays_df[
+                "日期"
+            ]:
 
                 if pd.notna(value):
 
@@ -410,9 +400,10 @@ def load_project_settings(
                     if pd.notna(date):
 
                         loaded_holidays.append(
-                            pd.Timestamp(date).normalize()
+                            pd.Timestamp(
+                                date
+                            ).normalize()
                         )
-
 
     # -----------------------------------------------------
     # 系統設定
@@ -432,52 +423,72 @@ def load_project_settings(
 
             settings_dict = dict(
                 zip(
-                    settings_df["設定"],
-                    settings_df["值"]
+                    settings_df[
+                        "設定"
+                    ],
+                    settings_df[
+                        "值"
+                    ]
                 )
             )
 
-
-            if "day_mode" in settings_dict:
+            if (
+                "day_mode"
+                in settings_dict
+            ):
 
                 value = str(
-                    settings_dict["day_mode"]
+                    settings_dict[
+                        "day_mode"
+                    ]
                 )
 
                 if value in [
                     "日曆天",
                     "工作天"
                 ]:
+                    loaded_day_mode = (
+                        value
+                    )
 
-                    loaded_day_mode = value
-
-
-            for key in loaded_workdays.keys():
+            for key in (
+                loaded_workdays.keys()
+            ):
 
                 if key in settings_dict:
 
-                    value = settings_dict[key]
+                    value = (
+                        settings_dict[
+                            key
+                        ]
+                    )
 
                     if isinstance(
                         value,
-                        (bool, np.bool_)
+                        (
+                            bool,
+                            np.bool_
+                        )
                     ):
-
-                        loaded_workdays[key] = bool(
+                        loaded_workdays[
+                            key
+                        ] = bool(
                             value
                         )
 
                     else:
-
-                        loaded_workdays[key] = (
-                            str(value).lower()
+                        loaded_workdays[
+                            key
+                        ] = (
+                            str(
+                                value
+                            ).lower()
                             in [
                                 "true",
                                 "1",
                                 "yes"
                             ]
                         )
-
 
     return (
         loaded_links,
@@ -489,136 +500,196 @@ def load_project_settings(
 
 
 # =========================================================
-# 建立 HTML 甘特圖
+# 建立甘特圖 HTML
 # =========================================================
 def create_gantt_html(
     gantt_df,
     links,
     day_mode,
     weekmask,
-    holidays
+    holidays,
+    project_title,
+    static_mode=False
 ):
 
     # =====================================================
-    # 甘特圖尺寸設定
+    # 外觀參數
     # =====================================================
-
-    # 每一天固定 28px
     DAY_WIDTH = 28
 
-    # 每一工作列高度
     ROW_HEIGHT = 70
 
-    # 表頭高度
     HEADER_HEIGHT = 75
 
-    # 工作名稱預設寬度
+    FOOTER_HEIGHT = 60
+
     LABEL_WIDTH = 250
 
-    # 工作名稱允許拖曳的最小 / 最大寬度
     LABEL_MIN_WIDTH = 150
+
     LABEL_MAX_WIDTH = 650
 
-    # 拖曳分隔線寬度
     RESIZER_WIDTH = 7
 
-    # 日期前後留白
+    SCROLLBAR_HEIGHT = 18
+
     DATE_PADDING = 7
 
 
-    today = pd.Timestamp.today().normalize()
+    server_today = (
+        pd.Timestamp.today()
+        .normalize()
+    )
 
 
     # =====================================================
     # 日期範圍
     # =====================================================
-    all_dates = gantt_df[
-        "完成期限"
-    ].dropna()
-
-
-    min_date = min(
-        all_dates.min(),
-        today
+    all_dates = (
+        gantt_df[
+            "完成期限"
+        ]
+        .dropna()
     )
 
-    max_date = max(
-        all_dates.max(),
-        today
+    min_task_date = (
+        all_dates.min()
+    )
+
+    max_task_date = (
+        all_dates.max()
     )
 
 
-    start_date = (
-        min_date
-        - pd.Timedelta(
-            days=DATE_PADDING
+    if static_mode:
+
+        start_date = (
+            min_task_date
+            -
+            pd.Timedelta(
+                days=60
+            )
+        ).normalize()
+
+        end_date = (
+            max_task_date
+            +
+            pd.Timedelta(
+                days=365
+            )
+        ).normalize()
+
+    else:
+
+        min_date = min(
+            min_task_date,
+            server_today
         )
-    ).normalize()
 
-
-    end_date = (
-        max_date
-        + pd.Timedelta(
-            days=DATE_PADDING
+        max_date = max(
+            max_task_date,
+            server_today
         )
-    ).normalize()
+
+        start_date = (
+            min_date
+            -
+            pd.Timedelta(
+                days=DATE_PADDING
+            )
+        ).normalize()
+
+        end_date = (
+            max_date
+            +
+            pd.Timedelta(
+                days=DATE_PADDING
+            )
+        ).normalize()
 
 
+    # =====================================================
+    # 時間軸尺寸
+    # =====================================================
     total_days = (
         end_date
-        - start_date
+        -
+        start_date
     ).days + 1
-
 
     timeline_width = (
         total_days
-        * DAY_WIDTH
+        *
+        DAY_WIDTH
     )
 
+    task_area_height = (
+        len(gantt_df)
+        *
+        ROW_HEIGHT
+    )
+
+    footer_start_y = (
+        HEADER_HEIGHT
+        +
+        task_area_height
+    )
 
     svg_height = (
         HEADER_HEIGHT
         +
-        len(gantt_df) * ROW_HEIGHT
+        task_area_height
+        +
+        FOOTER_HEIGHT
     )
 
 
     # =====================================================
-    # 日期 → X 座標
+    # 日期轉 X
     # =====================================================
     def date_to_x(date):
 
-        date = pd.Timestamp(
-            date
-        ).normalize()
+        date = (
+            pd.Timestamp(date)
+            .normalize()
+        )
 
         day_index = (
             date
-            - start_date
+            -
+            start_date
         ).days
 
         return (
-            day_index * DAY_WIDTH
+            day_index
+            *
+            DAY_WIDTH
             +
             DAY_WIDTH / 2
         )
 
 
     # =====================================================
-    # 工作項目 → Y 座標
+    # 工作項目 Y
     # =====================================================
     task_positions = {}
 
-    for index, row in gantt_df.reset_index(
-        drop=True
-    ).iterrows():
+    for index, row in (
+        gantt_df
+        .reset_index(
+            drop=True
+        )
+        .iterrows()
+    ):
 
         task_positions[
             row["工作項目"]
         ] = (
             HEADER_HEIGHT
             +
-            index * ROW_HEIGHT
+            index
+            *
+            ROW_HEIGHT
             +
             ROW_HEIGHT / 2
         )
@@ -632,7 +703,6 @@ def create_gantt_html(
         工作項目
     </div>
     """
-
 
     for _, row in gantt_df.iterrows():
 
@@ -653,6 +723,12 @@ def create_gantt_html(
         </div>
         """
 
+    labels_html += f"""
+    <div class="task-label-footer">
+        日期
+    </div>
+    """
+
 
     # =====================================================
     # SVG
@@ -661,7 +737,7 @@ def create_gantt_html(
 
 
     # -----------------------------------------------------
-    # 黑色背景
+    # 背景
     # -----------------------------------------------------
     svg_parts.append(
         f"""
@@ -677,23 +753,25 @@ def create_gantt_html(
 
 
     # =====================================================
-    # 每日背景與垂直線
+    # 每日背景 / 格線
     # =====================================================
     for i in range(total_days):
 
         current_date = (
             start_date
             +
-            pd.Timedelta(days=i)
+            pd.Timedelta(
+                days=i
+            )
         )
 
+        x = (
+            i
+            *
+            DAY_WIDTH
+        )
 
-        x = i * DAY_WIDTH
-
-
-        # -------------------------------------------------
         # 週末
-        # -------------------------------------------------
         if current_date.weekday() >= 5:
 
             svg_parts.append(
@@ -708,10 +786,7 @@ def create_gantt_html(
                 """
             )
 
-
-        # -------------------------------------------------
         # 每日格線
-        # -------------------------------------------------
         svg_parts.append(
             f"""
             <line
@@ -727,31 +802,34 @@ def create_gantt_html(
 
 
     # =====================================================
-    # 月份表頭
+    # 上下月份
     # =====================================================
     previous_month = None
-
 
     for i in range(total_days):
 
         current_date = (
             start_date
             +
-            pd.Timedelta(days=i)
+            pd.Timedelta(
+                days=i
+            )
         )
-
 
         month_key = (
             current_date.year,
             current_date.month
         )
 
-
         if month_key != previous_month:
 
-            x = i * DAY_WIDTH
+            x = (
+                i
+                *
+                DAY_WIDTH
+            )
 
-
+            # 月份分隔線
             svg_parts.append(
                 f"""
                 <line
@@ -765,7 +843,7 @@ def create_gantt_html(
                 """
             )
 
-
+            # 上方月份
             svg_parts.append(
                 f"""
                 <text
@@ -780,21 +858,38 @@ def create_gantt_html(
                 """
             )
 
+            # 下方月份
+            svg_parts.append(
+                f"""
+                <text
+                    x="{x + 6}"
+                    y="{footer_start_y + 22}"
+                    fill="#FFFFFF"
+                    font-size="13"
+                    font-weight="600"
+                >
+                    {format_month(current_date)}
+                </text>
+                """
+            )
 
-            previous_month = month_key
+            previous_month = (
+                month_key
+            )
 
 
     # =====================================================
-    # 日期表頭
+    # 上下日期刻度
     # =====================================================
     for i in range(total_days):
 
         current_date = (
             start_date
             +
-            pd.Timedelta(days=i)
+            pd.Timedelta(
+                days=i
+            )
         )
-
 
         if (
             i % 7 == 0
@@ -803,12 +898,20 @@ def create_gantt_html(
         ):
 
             x = (
-                i * DAY_WIDTH
+                i
+                *
+                DAY_WIDTH
                 +
                 DAY_WIDTH / 2
             )
 
+            date_text = (
+                format_short_date(
+                    current_date
+                )
+            )
 
+            # 上方
             svg_parts.append(
                 f"""
                 <text
@@ -818,14 +921,29 @@ def create_gantt_html(
                     font-size="11"
                     text-anchor="middle"
                 >
-                    {format_short_date(current_date)}
+                    {date_text}
+                </text>
+                """
+            )
+
+            # 下方
+            svg_parts.append(
+                f"""
+                <text
+                    x="{x}"
+                    y="{footer_start_y + 48}"
+                    fill="#CFCFCF"
+                    font-size="11"
+                    text-anchor="middle"
+                >
+                    {date_text}
                 </text>
                 """
             )
 
 
     # =====================================================
-    # 水平工作列格線
+    # 水平工作格線
     # =====================================================
     for i in range(
         len(gantt_df) + 1
@@ -834,9 +952,10 @@ def create_gantt_html(
         y = (
             HEADER_HEIGHT
             +
-            i * ROW_HEIGHT
+            i
+            *
+            ROW_HEIGHT
         )
-
 
         svg_parts.append(
             f"""
@@ -853,61 +972,61 @@ def create_gantt_html(
 
 
     # =====================================================
-    # 今天
+    # Streamlit 預覽版今天線
     # =====================================================
-    today_x = date_to_x(
-        today
-    )
+    if not static_mode:
 
+        today_x = (
+            date_to_x(
+                server_today
+            )
+        )
 
-    svg_parts.append(
-        f"""
-        <line
-            x1="{today_x}"
-            y1="0"
-            x2="{today_x}"
-            y2="{svg_height}"
-            stroke="#FF3B30"
-            stroke-width="3"
-            stroke-dasharray="7 5"
-        />
-        """
-    )
+        today_label = (
+            "今天 "
+            +
+            format_date(
+                server_today
+            )
+        )
 
+        svg_parts.append(
+            f"""
+            <g id="todayMarker">
 
-    today_label = (
-        "今天 "
-        +
-        format_date(today)
-    )
+                <line
+                    x1="{today_x}"
+                    y1="0"
+                    x2="{today_x}"
+                    y2="{svg_height}"
+                    stroke="#FF3B30"
+                    stroke-width="3"
+                    stroke-dasharray="7 5"
+                />
 
+                <rect
+                    x="{today_x - 46}"
+                    y="4"
+                    width="92"
+                    height="22"
+                    rx="4"
+                    fill="#D32F2F"
+                />
 
-    today_label_width = 92
+                <text
+                    x="{today_x}"
+                    y="19"
+                    fill="#FFFFFF"
+                    font-size="11"
+                    font-weight="600"
+                    text-anchor="middle"
+                >
+                    {today_label}
+                </text>
 
-
-    svg_parts.append(
-        f"""
-        <rect
-            x="{today_x - today_label_width / 2}"
-            y="4"
-            width="{today_label_width}"
-            height="22"
-            rx="4"
-            fill="#D32F2F"
-        />
-
-        <text
-            x="{today_x}"
-            y="19"
-            fill="#FFFFFF"
-            font-size="11"
-            font-weight="600"
-            text-anchor="middle"
-        >
-            {today_label}
-        </text>
-        """
-    )
+            </g>
+            """
+        )
 
 
     # =====================================================
@@ -915,34 +1034,36 @@ def create_gantt_html(
     # =====================================================
     for link in links:
 
-        start_name = link[
-            "start"
-        ]
+        start_name = (
+            link["start"]
+        )
 
-        end_name = link[
-            "end"
-        ]
-
+        end_name = (
+            link["end"]
+        )
 
         start_rows = gantt_df[
-            gantt_df["工作項目"]
-            == start_name
+            gantt_df[
+                "工作項目"
+            ]
+            ==
+            start_name
         ]
 
         end_rows = gantt_df[
-            gantt_df["工作項目"]
-            == end_name
+            gantt_df[
+                "工作項目"
+            ]
+            ==
+            end_name
         ]
-
 
         if (
             start_rows.empty
             or
             end_rows.empty
         ):
-
             continue
-
 
         start_task_date = (
             start_rows[
@@ -956,28 +1077,30 @@ def create_gantt_html(
             ].iloc[0]
         )
 
-
-        start_x = date_to_x(
-            start_task_date
+        start_x = (
+            date_to_x(
+                start_task_date
+            )
         )
 
-        end_x = date_to_x(
-            end_task_date
+        end_x = (
+            date_to_x(
+                end_task_date
+            )
         )
 
+        start_y = (
+            task_positions[
+                start_name
+            ]
+        )
 
-        start_y = task_positions[
-            start_name
-        ]
+        end_y = (
+            task_positions[
+                end_name
+            ]
+        )
 
-        end_y = task_positions[
-            end_name
-        ]
-
-
-        # -------------------------------------------------
-        # 天數
-        # -------------------------------------------------
         calendar_days = (
             calculate_calendar_days(
                 start_task_date,
@@ -985,34 +1108,29 @@ def create_gantt_html(
             )
         )
 
-
-        work_days = calculate_workdays(
-            start_task_date,
-            end_task_date,
-            weekmask,
-            holidays
+        work_days = (
+            calculate_workdays(
+                start_task_date,
+                end_task_date,
+                weekmask,
+                holidays
+            )
         )
 
-
         if day_mode == "日曆天":
-
             display_text = (
                 f"{calendar_days} 天"
             )
-
         else:
-
             display_text = (
                 f"{work_days} 工作天"
             )
 
+        LINE_COLOR = (
+            "#4DA3FF"
+        )
 
-        LINE_COLOR = "#4DA3FF"
-
-
-        # -------------------------------------------------
         # 水平線
-        # -------------------------------------------------
         svg_parts.append(
             f"""
             <line
@@ -1027,10 +1145,7 @@ def create_gantt_html(
             """
         )
 
-
-        # -------------------------------------------------
-        # 垂直連線
-        # -------------------------------------------------
+        # 垂直線
         if start_y != end_y:
 
             svg_parts.append(
@@ -1047,27 +1162,30 @@ def create_gantt_html(
                 """
             )
 
-
-        # -------------------------------------------------
-        # 天數標籤
-        # -------------------------------------------------
+        # 天數
         middle_x = (
             start_x
             +
             end_x
         ) / 2
 
-
         label_width = max(
             62,
-            len(display_text) * 15
+            len(
+                display_text
+            )
+            *
+            15
         )
-
 
         svg_parts.append(
             f"""
             <rect
-                x="{middle_x - label_width / 2}"
+                x="{
+                    middle_x
+                    -
+                    label_width / 2
+                }"
                 y="{start_y - 17}"
                 width="{label_width}"
                 height="26"
@@ -1092,36 +1210,41 @@ def create_gantt_html(
 
 
     # =====================================================
-    # 所有里程碑
+    # 里程碑
     # =====================================================
     for _, row in gantt_df.iterrows():
 
-        task_name = row[
-            "工作項目"
-        ]
-
-        milestone_date = row[
-            "完成期限"
-        ]
-
-
-        x = date_to_x(
-            milestone_date
+        task_name = (
+            row[
+                "工作項目"
+            ]
         )
 
-        y = task_positions[
-            task_name
-        ]
-
-
-        date_text = format_date(
-            milestone_date
+        milestone_date = (
+            row[
+                "完成期限"
+            ]
         )
 
+        x = (
+            date_to_x(
+                milestone_date
+            )
+        )
 
-        # -------------------------------------------------
-        # 日期在菱形上方
-        # -------------------------------------------------
+        y = (
+            task_positions[
+                task_name
+            ]
+        )
+
+        date_text = (
+            format_date(
+                milestone_date
+            )
+        )
+
+        # 日期
         svg_parts.append(
             f"""
             <text
@@ -1137,12 +1260,8 @@ def create_gantt_html(
             """
         )
 
-
-        # -------------------------------------------------
         # 菱形
-        # -------------------------------------------------
         diamond_size = 7
-
 
         points = (
             f"{x},{y - diamond_size} "
@@ -1150,7 +1269,6 @@ def create_gantt_html(
             f"{x},{y + diamond_size} "
             f"{x - diamond_size},{y}"
         )
-
 
         svg_parts.append(
             f"""
@@ -1161,49 +1279,221 @@ def create_gantt_html(
                 stroke-width="1.5"
             >
                 <title>
-                    {escape(str(task_name))}
-                    - {date_text}
+                    {
+                        escape(
+                            str(
+                                task_name
+                            )
+                        )
+                    }
+                    -
+                    {date_text}
                 </title>
             </polygon>
             """
         )
 
 
-    # =====================================================
-    # 組合 SVG
-    # =====================================================
     svg_content = "".join(
         svg_parts
     )
 
 
     # =====================================================
-    # 預設移動至今天附近
+    # 初始位置
     # =====================================================
+    initial_x = (
+        date_to_x(
+            server_today
+        )
+    )
+
     initial_scroll = max(
         0,
-        today_x - 450
+        initial_x - 450
+    )
+
+
+    safe_title = escape(
+        project_title
     )
 
 
     # =====================================================
-    # HTML
+    # 匯出時間
     # =====================================================
-    html = f"""
+    export_time = (
+        pd.Timestamp.now()
+    )
+
+    export_time_text = (
+        f"{format_date(export_time)} "
+        f"{export_time.strftime('%H:%M')}"
+    )
+
+
+    # =====================================================
+    # BODY
+    # =====================================================
+    body_content = f"""
+
+    <div class="page-header">
+
+        <div>
+
+            <h1>
+                📊 {safe_title}
+            </h1>
+
+            {
+                f'''
+                <div class="update-time">
+                    資料匯出時間：
+                    {export_time_text}
+                </div>
+                '''
+                if static_mode
+                else
+                ""
+            }
+
+        </div>
+
+        <div class="header-actions">
+
+            <button
+                id="todayButton"
+                type="button"
+            >
+                跳到今天
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <div
+        id="ganttWrapper"
+        class="gantt-wrapper"
+    >
+
+        <!-- 上方捲軸左側空白 -->
+        <div class="top-left-spacer"></div>
+
+        <div class="top-resizer-spacer"></div>
+
+        <!-- 上方水平捲軸 -->
+        <div
+            id="topScroll"
+            class="external-scroll"
+        >
+            <div
+                class="scroll-width"
+            ></div>
+        </div>
+
+
+        <!-- 左側工作項目 -->
+        <div
+            class="task-labels"
+        >
+            {labels_html}
+        </div>
+
+
+        <!-- 欄寬調整 -->
+        <div
+            id="columnResizer"
+            class="column-resizer"
+            title="左右拖曳調整工作項目欄寬"
+        >
+        </div>
+
+
+        <!-- 主時間軸 -->
+        <div
+            id="timelineScroll"
+            class="timeline-scroll"
+        >
+
+            <svg
+                id="timelineSvg"
+                class="timeline-svg"
+                width="{timeline_width}"
+                height="{svg_height}"
+                viewBox="
+                    0
+                    0
+                    {timeline_width}
+                    {svg_height}
+                "
+            >
+                {svg_content}
+            </svg>
+
+        </div>
+
+
+        <!-- 下方捲軸左側空白 -->
+        <div class="bottom-left-spacer"></div>
+
+        <div class="bottom-resizer-spacer"></div>
+
+        <!-- 下方水平捲軸 -->
+        <div
+            id="bottomScroll"
+            class="external-scroll"
+        >
+            <div
+                class="scroll-width"
+            ></div>
+        </div>
+
+    </div>
+
+
+    <div class="legend">
+
+        <div class="legend-item">
+            <div class="legend-line"></div>
+            工作連動期間
+        </div>
+
+        <div class="legend-item">
+            <div class="legend-diamond"></div>
+            工作完成期限
+        </div>
+
+        <div class="legend-item">
+            <div class="legend-today"></div>
+            今天
+        </div>
+
+        <div class="resize-hint">
+            ↔ 拖曳分隔線可調整工作項目欄寬
+        </div>
+
+    </div>
+    """
+
+
+    # =====================================================
+    # CSS
+    # =====================================================
+    css = f"""
     <style>
 
         * {{
             box-sizing: border-box;
         }}
 
-
+        html,
         body {{
-
             margin: 0;
-
             padding: 0;
-
-            background: transparent;
+            background: #050505;
+            color: #FFFFFF;
 
             font-family:
                 -apple-system,
@@ -1214,8 +1504,53 @@ def create_gantt_html(
         }}
 
 
+        .page-container {{
+            padding: 18px;
+            width: 100%;
+        }}
+
+
+        .page-header {{
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 16px;
+        }}
+
+
+        .page-header h1 {{
+            margin: 0;
+            color: #FFFFFF;
+            font-size: 24px;
+        }}
+
+
+        .update-time {{
+            margin-top: 6px;
+            color: #AAAAAA;
+            font-size: 12px;
+        }}
+
+
+        #todayButton {{
+            border: 1px solid #666666;
+            background: #202020;
+            color: #FFFFFF;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }}
+
+
+        #todayButton:hover {{
+            background: #303030;
+        }}
+
+
         /* =================================================
-           甘特圖主框
+           主 Grid
            ================================================= */
 
         .gantt-wrapper {{
@@ -1230,112 +1565,91 @@ def create_gantt_html(
                 {RESIZER_WIDTH}px
                 minmax(0, 1fr);
 
+            grid-template-rows:
+                {SCROLLBAR_HEIGHT}px
+                auto
+                {SCROLLBAR_HEIGHT}px;
+
             width: 100%;
 
             border:
-                1px solid
-                #444444;
+                1px solid #444444;
 
             border-radius:
                 8px;
 
-            overflow: hidden;
+            overflow:
+                hidden;
 
             background:
                 #080808;
         }}
 
 
+        .top-left-spacer,
+        .bottom-left-spacer {{
+            background: #111111;
+        }}
+
+
+        .top-resizer-spacer,
+        .bottom-resizer-spacer {{
+            background: #333333;
+        }}
+
+
         /* =================================================
-           左側工作名稱區
+           左側工作項目
            ================================================= */
 
         .task-labels {{
-
-            background:
-                #111111;
-
-            color:
-                #FFFFFF;
-
+            background: #111111;
+            color: #FFFFFF;
             min-width: 0;
-
-            z-index: 2;
         }}
 
 
         .task-label-header {{
-
-            height:
-                {HEADER_HEIGHT}px;
+            height: {HEADER_HEIGHT}px;
 
             display: flex;
-
             align-items: center;
 
-            padding:
-                0 14px;
+            padding: 0 14px;
 
-            font-size:
-                13px;
-
-            font-weight:
-                700;
+            font-size: 13px;
+            font-weight: 700;
 
             border-bottom:
-                1px solid
-                #444444;
+                1px solid #444444;
 
             background:
                 #181818;
         }}
 
 
-        /* =================================================
-           工作項目格子
-
-           重要：
-           取消 ellipsis
-           改成自動換行
-           ================================================= */
-
         .task-label-row {{
-
-            height:
-                {ROW_HEIGHT}px;
+            height: {ROW_HEIGHT}px;
 
             display: flex;
-
             align-items: center;
 
-            padding:
-                7px 14px;
+            padding: 7px 14px;
 
-            font-size:
-                13px;
-
-            font-weight:
-                500;
-
-            color:
-                #FFFFFF;
+            color: #FFFFFF;
 
             border-bottom:
-                1px solid
-                #303030;
+                1px solid #303030;
 
             min-width: 0;
-
             overflow: hidden;
         }}
 
 
         .task-label-text {{
-
             width: 100%;
 
-            white-space:
-                normal;
+            white-space: normal;
 
             overflow-wrap:
                 anywhere;
@@ -1346,13 +1660,14 @@ def create_gantt_html(
             line-height:
                 1.35;
 
-            color:
-                #FFFFFF;
+            font-size:
+                13px;
 
             max-height:
                 calc(
                     {ROW_HEIGHT}px
-                    - 14px
+                    -
+                    14px
                 );
 
             overflow:
@@ -1360,17 +1675,35 @@ def create_gantt_html(
         }}
 
 
+        .task-label-footer {{
+            height: {FOOTER_HEIGHT}px;
+
+            display: flex;
+            align-items: center;
+
+            padding: 0 14px;
+
+            color: #AAAAAA;
+
+            font-size: 12px;
+
+            background:
+                #181818;
+
+            border-top:
+                1px solid #444444;
+        }}
+
+
         /* =================================================
-           可拖曳欄寬分隔線
+           欄寬拖曳
            ================================================= */
 
         .column-resizer {{
-
             width:
                 {RESIZER_WIDTH}px;
 
-            height:
-                100%;
+            height: 100%;
 
             background:
                 #333333;
@@ -1381,47 +1714,28 @@ def create_gantt_html(
             position:
                 relative;
 
-            z-index:
-                10;
-
             user-select:
                 none;
         }}
 
 
-        .column-resizer:hover {{
-
-            background:
-                #4DA3FF;
-        }}
-
-
+        .column-resizer:hover,
         .column-resizer.dragging {{
-
             background:
                 #4DA3FF;
         }}
 
 
         .column-resizer::after {{
+            content: "";
 
-            content:
-                "";
+            position: absolute;
 
-            position:
-                absolute;
+            left: 2px;
+            top: 0;
+            bottom: 0;
 
-            top:
-                0;
-
-            bottom:
-                0;
-
-            left:
-                2px;
-
-            width:
-                2px;
+            width: 2px;
 
             background:
                 rgba(
@@ -1434,13 +1748,11 @@ def create_gantt_html(
 
 
         /* =================================================
-           時間軸 + 真正水平捲軸
+           主時間軸
            ================================================= */
 
         .timeline-scroll {{
-
             width: 100%;
-
             min-width: 0;
 
             overflow-x:
@@ -1452,54 +1764,18 @@ def create_gantt_html(
             background:
                 #080808;
 
-            scrollbar-color:
-                #777777
-                #1A1A1A;
-
             scrollbar-width:
-                auto;
+                none;
         }}
 
 
         .timeline-scroll::-webkit-scrollbar {{
-
-            height:
-                16px;
-        }}
-
-
-        .timeline-scroll::-webkit-scrollbar-track {{
-
-            background:
-                #1A1A1A;
-        }}
-
-
-        .timeline-scroll::-webkit-scrollbar-thumb {{
-
-            background:
-                #777777;
-
-            border-radius:
-                8px;
-
-            border:
-                3px solid
-                #1A1A1A;
-        }}
-
-
-        .timeline-scroll::-webkit-scrollbar-thumb:hover {{
-
-            background:
-                #AAAAAA;
+            display: none;
         }}
 
 
         .timeline-svg {{
-
-            display:
-                block;
+            display: block;
 
             width:
                 {timeline_width}px;
@@ -1513,28 +1789,93 @@ def create_gantt_html(
 
 
         /* =================================================
+           上下捲軸
+           ================================================= */
+
+        .external-scroll {{
+            width: 100%;
+            min-width: 0;
+
+            overflow-x:
+                scroll;
+
+            overflow-y:
+                hidden;
+
+            height:
+                {SCROLLBAR_HEIGHT}px;
+
+            background:
+                #151515;
+
+            scrollbar-color:
+                #777777
+                #1A1A1A;
+
+            scrollbar-width:
+                auto;
+        }}
+
+
+        .external-scroll::-webkit-scrollbar {{
+            height:
+                {SCROLLBAR_HEIGHT}px;
+        }}
+
+
+        .external-scroll::-webkit-scrollbar-track {{
+            background:
+                #1A1A1A;
+        }}
+
+
+        .external-scroll::-webkit-scrollbar-thumb {{
+            background:
+                #777777;
+
+            border-radius:
+                8px;
+
+            border:
+                3px solid
+                #1A1A1A;
+        }}
+
+
+        .external-scroll::-webkit-scrollbar-thumb:hover {{
+            background:
+                #AAAAAA;
+        }}
+
+
+        .scroll-width {{
+            width:
+                {timeline_width}px;
+
+            min-width:
+                {timeline_width}px;
+
+            height:
+                1px;
+        }}
+
+
+        /* =================================================
            圖例
            ================================================= */
 
         .legend {{
+            margin-top: 10px;
 
-            margin-top:
-                10px;
+            display: flex;
 
-            display:
-                flex;
+            gap: 22px;
 
-            gap:
-                22px;
+            flex-wrap: wrap;
 
-            flex-wrap:
-                wrap;
+            color: #FFFFFF;
 
-            color:
-                #FFFFFF;
-
-            font-size:
-                12px;
+            font-size: 12px;
 
             padding:
                 10px 12px;
@@ -1548,25 +1889,15 @@ def create_gantt_html(
 
 
         .legend-item {{
-
-            display:
-                flex;
-
-            align-items:
-                center;
-
-            gap:
-                7px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
         }}
 
 
         .legend-line {{
-
-            width:
-                24px;
-
-            height:
-                5px;
+            width: 24px;
+            height: 5px;
 
             background:
                 #4DA3FF;
@@ -1577,19 +1908,14 @@ def create_gantt_html(
 
 
         .legend-diamond {{
-
-            width:
-                10px;
-
-            height:
-                10px;
+            width: 10px;
+            height: 10px;
 
             background:
                 #FFD54F;
 
             border:
-                1px solid
-                #FFFFFF;
+                1px solid #FFFFFF;
 
             transform:
                 rotate(45deg);
@@ -1597,12 +1923,8 @@ def create_gantt_html(
 
 
         .legend-today {{
-
-            width:
-                3px;
-
-            height:
-                18px;
+            width: 3px;
+            height: 18px;
 
             background:
                 #FF3B30;
@@ -1610,351 +1932,765 @@ def create_gantt_html(
 
 
         .resize-hint {{
-
-            margin-left:
-                auto;
+            margin-left: auto;
 
             color:
                 #AAAAAA;
 
-            font-size:
-                11px;
+            font-size: 11px;
         }}
 
     </style>
+    """
 
 
-    <div
-        id="ganttWrapper"
-        class="gantt-wrapper"
-    >
-
-        <!-- ==============================================
-             左側工作項目
-             ============================================== -->
-
-        <div class="task-labels">
-
-            {labels_html}
-
-        </div>
+    # =====================================================
+    # JavaScript
+    # =====================================================
+    start_iso = (
+        start_date.strftime(
+            "%Y-%m-%d"
+        )
+    )
 
 
-        <!-- ==============================================
-             Excel 類似的拖曳欄寬分隔線
-             ============================================== -->
-
-        <div
-            id="columnResizer"
-            class="column-resizer"
-            title="左右拖曳調整工作項目欄寬"
-        >
-        </div>
-
-
-        <!-- ==============================================
-             右側時間軸
-             ============================================== -->
-
-        <div
-            id="timelineScroll"
-            class="timeline-scroll"
-        >
-
-            <svg
-                class="timeline-svg"
-                width="{timeline_width}"
-                height="{svg_height}"
-                viewBox="
-                    0
-                    0
-                    {timeline_width}
-                    {svg_height}
-                "
-            >
-
-                {svg_content}
-
-            </svg>
-
-        </div>
-
-    </div>
-
-
-    <!-- =================================================
-         圖例
-         ================================================= -->
-
-    <div class="legend">
-
-        <div class="legend-item">
-
-            <div class="legend-line"></div>
-
-            工作連動期間
-
-        </div>
-
-
-        <div class="legend-item">
-
-            <div class="legend-diamond"></div>
-
-            工作完成期限
-
-        </div>
-
-
-        <div class="legend-item">
-
-            <div class="legend-today"></div>
-
-            今天
-
-        </div>
-
-
-        <div class="legend-item">
-
-            每一天固定 {DAY_WIDTH}px
-
-        </div>
-
-
-        <div class="resize-hint">
-
-            ↔ 拖曳分隔線可調整工作項目欄寬
-
-        </div>
-
-    </div>
-
-
+    js = f"""
     <script>
 
-        // =================================================
-        // 預設將時間軸移到今天附近
-        // =================================================
+        const DAY_WIDTH =
+            {DAY_WIDTH};
 
-        const scroller =
+        const TIMELINE_START =
+            "{start_iso}";
+
+        const SVG_HEIGHT =
+            {svg_height};
+
+        const STATIC_MODE =
+            {
+                "true"
+                if static_mode
+                else
+                "false"
+            };
+
+
+        const topScroller =
+            document.getElementById(
+                "topScroll"
+            );
+
+        const mainScroller =
             document.getElementById(
                 "timelineScroll"
             );
 
-
-        if (scroller) {{
-
-            scroller.scrollLeft =
-                {initial_scroll};
-
-        }}
-
-
-        // =================================================
-        // Excel 類似的欄寬拖曳功能
-        // =================================================
+        const bottomScroller =
+            document.getElementById(
+                "bottomScroll"
+            );
 
         const wrapper =
             document.getElementById(
                 "ganttWrapper"
             );
 
-
         const resizer =
             document.getElementById(
                 "columnResizer"
             );
 
+        const svg =
+            document.getElementById(
+                "timelineSvg"
+            );
+
+        const todayButton =
+            document.getElementById(
+                "todayButton"
+            );
+
+
+        // =================================================
+        // 日期工具
+        // =================================================
+
+        function localToday() {{
+
+            const now =
+                new Date();
+
+            return new Date(
+                now.getFullYear(),
+                now.getMonth(),
+                now.getDate()
+            );
+        }}
+
+
+        function parseDate(
+            value
+        ) {{
+
+            const p =
+                value.split(
+                    "-"
+                );
+
+            return new Date(
+                Number(
+                    p[0]
+                ),
+                Number(
+                    p[1]
+                ) - 1,
+                Number(
+                    p[2]
+                )
+            );
+        }}
+
+
+        function daysBetween(
+            start,
+            end
+        ) {{
+
+            const oneDay =
+                86400000;
+
+            const a =
+                Date.UTC(
+                    start.getFullYear(),
+                    start.getMonth(),
+                    start.getDate()
+                );
+
+            const b =
+                Date.UTC(
+                    end.getFullYear(),
+                    end.getMonth(),
+                    end.getDate()
+                );
+
+            return Math.round(
+                (
+                    b - a
+                )
+                /
+                oneDay
+            );
+        }}
+
+
+        function dateToX(
+            date
+        ) {{
+
+            const start =
+                parseDate(
+                    TIMELINE_START
+                );
+
+            return (
+                daysBetween(
+                    start,
+                    date
+                )
+                *
+                DAY_WIDTH
+                +
+                DAY_WIDTH / 2
+            );
+        }}
+
+
+        function formatDisplayDate(
+            date
+        ) {{
+
+            return (
+                String(
+                    date.getFullYear()
+                ).slice(
+                    -2
+                )
+                +
+                "/"
+                +
+                (
+                    date.getMonth()
+                    +
+                    1
+                )
+                +
+                "/"
+                +
+                date.getDate()
+            );
+        }}
+
+
+        // =================================================
+        // 三個橫向位置同步
+        // =================================================
+
+        let syncingScroll =
+            false;
+
+
+        function syncScroll(
+            source
+        ) {{
+
+            if (
+                syncingScroll
+            ) {{
+                return;
+            }}
+
+            syncingScroll =
+                true;
+
+            const left =
+                source.scrollLeft;
+
+
+            if (
+                source
+                !==
+                topScroller
+            ) {{
+                topScroller.scrollLeft =
+                    left;
+            }}
+
+
+            if (
+                source
+                !==
+                mainScroller
+            ) {{
+                mainScroller.scrollLeft =
+                    left;
+            }}
+
+
+            if (
+                source
+                !==
+                bottomScroller
+            ) {{
+                bottomScroller.scrollLeft =
+                    left;
+            }}
+
+
+            requestAnimationFrame(
+                function() {{
+
+                    syncingScroll =
+                        false;
+
+                }}
+            );
+        }}
+
+
+        topScroller.addEventListener(
+            "scroll",
+            function() {{
+                syncScroll(
+                    topScroller
+                );
+            }}
+        );
+
+
+        mainScroller.addEventListener(
+            "scroll",
+            function() {{
+                syncScroll(
+                    mainScroller
+                );
+            }}
+        );
+
+
+        bottomScroller.addEventListener(
+            "scroll",
+            function() {{
+                syncScroll(
+                    bottomScroller
+                );
+            }}
+        );
+
+
+        function setScrollLeft(
+            left
+        ) {{
+
+            topScroller.scrollLeft =
+                left;
+
+            mainScroller.scrollLeft =
+                left;
+
+            bottomScroller.scrollLeft =
+                left;
+        }}
+
+
+        // =================================================
+        // 靜態版今天線
+        // =================================================
+
+        function drawTodayMarker() {{
+
+            if (
+                !STATIC_MODE
+                ||
+                !svg
+            ) {{
+                return;
+            }}
+
+
+            const old =
+                document.getElementById(
+                    "todayMarker"
+                );
+
+            if (old) {{
+                old.remove();
+            }}
+
+
+            const today =
+                localToday();
+
+            const x =
+                dateToX(
+                    today
+                );
+
+
+            if (
+                x < 0
+                ||
+                x > {timeline_width}
+            ) {{
+                return;
+            }}
+
+
+            const NS =
+                "http://www.w3.org/2000/svg";
+
+
+            const group =
+                document.createElementNS(
+                    NS,
+                    "g"
+                );
+
+            group.setAttribute(
+                "id",
+                "todayMarker"
+            );
+
+
+            const line =
+                document.createElementNS(
+                    NS,
+                    "line"
+                );
+
+            line.setAttribute(
+                "x1",
+                x
+            );
+
+            line.setAttribute(
+                "x2",
+                x
+            );
+
+            line.setAttribute(
+                "y1",
+                0
+            );
+
+            line.setAttribute(
+                "y2",
+                SVG_HEIGHT
+            );
+
+            line.setAttribute(
+                "stroke",
+                "#FF3B30"
+            );
+
+            line.setAttribute(
+                "stroke-width",
+                3
+            );
+
+            line.setAttribute(
+                "stroke-dasharray",
+                "7 5"
+            );
+
+
+            const rect =
+                document.createElementNS(
+                    NS,
+                    "rect"
+                );
+
+            rect.setAttribute(
+                "x",
+                x - 46
+            );
+
+            rect.setAttribute(
+                "y",
+                4
+            );
+
+            rect.setAttribute(
+                "width",
+                92
+            );
+
+            rect.setAttribute(
+                "height",
+                22
+            );
+
+            rect.setAttribute(
+                "rx",
+                4
+            );
+
+            rect.setAttribute(
+                "fill",
+                "#D32F2F"
+            );
+
+
+            const text =
+                document.createElementNS(
+                    NS,
+                    "text"
+                );
+
+            text.setAttribute(
+                "x",
+                x
+            );
+
+            text.setAttribute(
+                "y",
+                19
+            );
+
+            text.setAttribute(
+                "fill",
+                "#FFFFFF"
+            );
+
+            text.setAttribute(
+                "font-size",
+                11
+            );
+
+            text.setAttribute(
+                "font-weight",
+                600
+            );
+
+            text.setAttribute(
+                "text-anchor",
+                "middle"
+            );
+
+            text.textContent =
+                "今天 "
+                +
+                formatDisplayDate(
+                    today
+                );
+
+
+            group.appendChild(
+                line
+            );
+
+            group.appendChild(
+                rect
+            );
+
+            group.appendChild(
+                text
+            );
+
+            svg.appendChild(
+                group
+            );
+        }}
+
+
+        // =================================================
+        // 跳到今天
+        // =================================================
+
+        function scrollToToday() {{
+
+            const today =
+                localToday();
+
+            const x =
+                dateToX(
+                    today
+                );
+
+            const target =
+                Math.max(
+                    0,
+                    x
+                    -
+                    mainScroller.clientWidth
+                    /
+                    2
+                );
+
+            setScrollLeft(
+                target
+            );
+        }}
+
+
+        if (
+            todayButton
+        ) {{
+
+            todayButton.addEventListener(
+                "click",
+                scrollToToday
+            );
+        }}
+
+
+        // =================================================
+        // 初始位置
+        // =================================================
+
+        setScrollLeft(
+            {initial_scroll}
+        );
+
+
+        // =================================================
+        // Excel 式欄寬拖曳
+        // =================================================
 
         let isResizing =
             false;
 
-
         let startMouseX =
             0;
-
 
         let startWidth =
             {LABEL_WIDTH};
 
-
         const minWidth =
             {LABEL_MIN_WIDTH};
-
 
         const maxWidth =
             {LABEL_MAX_WIDTH};
 
 
-        if (
-            wrapper
-            &&
-            resizer
-        ) {{
+        resizer.addEventListener(
+            "mousedown",
+            function(
+                event
+            ) {{
 
-            // ---------------------------------------------
-            // 開始拖曳
-            // ---------------------------------------------
+                isResizing =
+                    true;
 
-            resizer.addEventListener(
-                "mousedown",
-                function(event) {{
+                startMouseX =
+                    event.clientX;
 
-                    isResizing =
-                        true;
+                const currentWidth =
+                    getComputedStyle(
+                        wrapper
+                    )
+                    .getPropertyValue(
+                        "--label-width"
+                    );
 
-                    startMouseX =
-                        event.clientX;
+                startWidth =
+                    parseFloat(
+                        currentWidth
+                    );
+
+                resizer.classList.add(
+                    "dragging"
+                );
+
+                document.body.style.cursor =
+                    "col-resize";
+
+                document.body.style.userSelect =
+                    "none";
+            }}
+        );
 
 
-                    const currentWidth =
-                        getComputedStyle(
-                            wrapper
+        window.addEventListener(
+            "mousemove",
+            function(
+                event
+            ) {{
+
+                if (
+                    !isResizing
+                ) {{
+                    return;
+                }}
+
+                let width =
+                    startWidth
+                    +
+                    event.clientX
+                    -
+                    startMouseX;
+
+                width =
+                    Math.max(
+                        minWidth,
+                        Math.min(
+                            maxWidth,
+                            width
                         )
-                        .getPropertyValue(
-                            "--label-width"
-                        );
-
-
-                    startWidth =
-                        parseFloat(
-                            currentWidth
-                        );
-
-
-                    resizer.classList.add(
-                        "dragging"
                     );
 
+                wrapper.style.setProperty(
+                    "--label-width",
+                    width
+                    +
+                    "px"
+                );
+            }}
+        );
 
-                    document.body.style.cursor =
-                        "col-resize";
 
+        window.addEventListener(
+            "mouseup",
+            function() {{
 
-                    document.body.style.userSelect =
-                        "none";
-
+                if (
+                    !isResizing
+                ) {{
+                    return;
                 }}
-            );
+
+                isResizing =
+                    false;
+
+                resizer.classList.remove(
+                    "dragging"
+                );
+
+                document.body.style.cursor =
+                    "";
+
+                document.body.style.userSelect =
+                    "";
+            }}
+        );
 
 
-            // ---------------------------------------------
-            // 拖曳中
-            // ---------------------------------------------
-
-            window.addEventListener(
-                "mousemove",
-                function(event) {{
-
-                    if (
-                        !isResizing
-                    ) {{
-
-                        return;
-
-                    }}
-
-
-                    const delta =
-                        event.clientX
-                        -
-                        startMouseX;
-
-
-                    let newWidth =
-                        startWidth
-                        +
-                        delta;
-
-
-                    // 最小欄寬
-                    if (
-                        newWidth
-                        <
-                        minWidth
-                    ) {{
-
-                        newWidth =
-                            minWidth;
-
-                    }}
-
-
-                    // 最大欄寬
-                    if (
-                        newWidth
-                        >
-                        maxWidth
-                    ) {{
-
-                        newWidth =
-                            maxWidth;
-
-                    }}
-
-
-                    wrapper.style.setProperty(
-                        "--label-width",
-                        newWidth
-                        +
-                        "px"
-                    );
-
-                }}
-            );
-
-
-            // ---------------------------------------------
-            // 停止拖曳
-            // ---------------------------------------------
-
-            window.addEventListener(
-                "mouseup",
-                function() {{
-
-                    if (
-                        !isResizing
-                    ) {{
-
-                        return;
-
-                    }}
-
-
-                    isResizing =
-                        false;
-
-
-                    resizer.classList.remove(
-                        "dragging"
-                    );
-
-
-                    document.body.style.cursor =
-                        "";
-
-
-                    document.body.style.userSelect =
-                        "";
-
-                }}
-            );
-
-        }}
+        drawTodayMarker();
 
     </script>
     """
 
 
-    return html, svg_height
+    # =====================================================
+    # 靜態 HTML
+    # =====================================================
+    if static_mode:
+
+        html = f"""
+        <!DOCTYPE html>
+
+        <html lang="zh-Hant">
+
+        <head>
+
+            <meta charset="UTF-8">
+
+            <meta
+                name="viewport"
+                content="
+                    width=device-width,
+                    initial-scale=1.0
+                "
+            >
+
+            <title>
+                {safe_title}
+            </title>
+
+            {css}
+
+        </head>
+
+        <body>
+
+            <div class="page-container">
+
+                {body_content}
+
+            </div>
+
+            {js}
+
+        </body>
+
+        </html>
+        """
+
+    else:
+
+        html = f"""
+        {css}
+
+        <div class="page-container">
+
+            {body_content}
+
+        </div>
+
+        {js}
+        """
+
+
+    return (
+        html,
+        svg_height
+    )
 
 
 # =========================================================
 # 上傳 Excel
 # =========================================================
 uploaded_file = st.file_uploader(
-    "請上傳 Excel 檔案",
+    "請上傳 Excel 檔案，甘特圖標題會是上傳的檔名",
     type=["xlsx"],
     help=(
         "可以上傳只有「工作項目」與「完成期限」的一般 Excel，"
@@ -1967,6 +2703,25 @@ uploaded_file = st.file_uploader(
 # Excel 已上傳
 # =========================================================
 if uploaded_file is not None:
+
+    # -----------------------------------------------------
+    # Excel 檔名作為專案名稱
+    # -----------------------------------------------------
+    original_filename = (
+        uploaded_file.name
+    )
+
+    if original_filename.lower().endswith(
+        ".xlsx"
+    ):
+        project_title = (
+            original_filename[:-5]
+        )
+    else:
+        project_title = (
+            original_filename
+        )
+
 
     # -----------------------------------------------------
     # 讀取 Excel
@@ -1991,7 +2746,7 @@ if uploaded_file is not None:
 
 
     # =====================================================
-    # 判斷專案檔 / 一般 Excel
+    # 判斷專案檔
     # =====================================================
     if "工作項目" in sheet_names:
 
@@ -2033,13 +2788,11 @@ if uploaded_file is not None:
         "完成期限"
     ]
 
-
     missing_columns = [
         col
         for col in required_columns
         if col not in df.columns
     ]
-
 
     if missing_columns:
 
@@ -2055,33 +2808,34 @@ if uploaded_file is not None:
 
 
     # =====================================================
-    # 整理工作名稱
+    # 整理資料
     # =====================================================
     df["工作項目"] = (
-        df["工作項目"]
-        .astype(str)
+        df[
+            "工作項目"
+        ]
+        .astype(
+            str
+        )
         .str.strip()
     )
 
 
-    # =====================================================
-    # 日期轉換
-    # =====================================================
     df["完成期限"] = (
         pd.to_datetime(
-            df["完成期限"],
+            df[
+                "完成期限"
+            ],
             errors="coerce"
         )
     )
 
 
-    # =====================================================
-    # 日期錯誤
-    # =====================================================
     invalid_date = df[
-        df["完成期限"].isna()
+        df[
+            "完成期限"
+        ].isna()
     ]
-
 
     if not invalid_date.empty:
 
@@ -2096,15 +2850,15 @@ if uploaded_file is not None:
         )
 
 
-    # =====================================================
-    # 有效工作資料
-    # =====================================================
-    gantt_df = df.dropna(
-        subset=[
-            "工作項目",
-            "完成期限"
-        ]
-    ).copy()
+    gantt_df = (
+        df.dropna(
+            subset=[
+                "工作項目",
+                "完成期限"
+            ]
+        )
+        .copy()
+    )
 
 
     if gantt_df.empty:
@@ -2137,15 +2891,13 @@ if uploaded_file is not None:
         )
 
 
-    task_list = (
-        gantt_df[
-            "工作項目"
-        ].tolist()
-    )
+    task_list = gantt_df[
+        "工作項目"
+    ].tolist()
 
 
     # =====================================================
-    # 自動載入專案設定
+    # 載入專案設定
     # =====================================================
     current_file_name = (
         uploaded_file.name
@@ -2172,7 +2924,6 @@ if uploaded_file is not None:
                 task_list
             )
 
-
             st.session_state.links = (
                 loaded_links
             )
@@ -2193,14 +2944,12 @@ if uploaded_file is not None:
                 current_file_name
             )
 
-
             if invalid_links:
 
                 st.warning(
                     f"有 {len(invalid_links)} 組連動"
                     "因工作項目不存在而未載入。"
                 )
-
 
         except Exception as e:
 
@@ -2219,9 +2968,7 @@ if uploaded_file is not None:
     )
 
 
-    display_df = (
-        gantt_df.copy()
-    )
+    display_df = gantt_df.copy()
 
 
     display_df[
@@ -2243,7 +2990,7 @@ if uploaded_file is not None:
 
 
     # =====================================================
-    # 天數計算設定
+    # 天數計算
     # =====================================================
     st.divider()
 
@@ -2260,9 +3007,12 @@ if uploaded_file is not None:
         ],
         index=(
             0
-            if st.session_state.day_mode
-            == "日曆天"
-            else 1
+            if
+            st.session_state.day_mode
+            ==
+            "日曆天"
+            else
+            1
         ),
         horizontal=True
     )
@@ -2274,7 +3024,7 @@ if uploaded_file is not None:
 
 
     # =====================================================
-    # 工作天模式
+    # 工作天設定
     # =====================================================
     if day_mode == "工作天":
 
@@ -2296,16 +3046,22 @@ if uploaded_file is not None:
 
             monday = st.checkbox(
                 "星期一",
-                value=st.session_state.workdays[
-                    "monday"
-                ]
+                value=(
+                    st.session_state
+                    .workdays[
+                        "monday"
+                    ]
+                )
             )
 
             friday = st.checkbox(
                 "星期五",
-                value=st.session_state.workdays[
-                    "friday"
-                ]
+                value=(
+                    st.session_state
+                    .workdays[
+                        "friday"
+                    ]
+                )
             )
 
 
@@ -2313,16 +3069,22 @@ if uploaded_file is not None:
 
             tuesday = st.checkbox(
                 "星期二",
-                value=st.session_state.workdays[
-                    "tuesday"
-                ]
+                value=(
+                    st.session_state
+                    .workdays[
+                        "tuesday"
+                    ]
+                )
             )
 
             saturday = st.checkbox(
                 "星期六",
-                value=st.session_state.workdays[
-                    "saturday"
-                ]
+                value=(
+                    st.session_state
+                    .workdays[
+                        "saturday"
+                    ]
+                )
             )
 
 
@@ -2330,16 +3092,22 @@ if uploaded_file is not None:
 
             wednesday = st.checkbox(
                 "星期三",
-                value=st.session_state.workdays[
-                    "wednesday"
-                ]
+                value=(
+                    st.session_state
+                    .workdays[
+                        "wednesday"
+                    ]
+                )
             )
 
             sunday = st.checkbox(
                 "星期日",
-                value=st.session_state.workdays[
-                    "sunday"
-                ]
+                value=(
+                    st.session_state
+                    .workdays[
+                        "sunday"
+                    ]
+                )
             )
 
 
@@ -2347,40 +3115,31 @@ if uploaded_file is not None:
 
             thursday = st.checkbox(
                 "星期四",
-                value=st.session_state.workdays[
-                    "thursday"
-                ]
+                value=(
+                    st.session_state
+                    .workdays[
+                        "thursday"
+                    ]
+                )
             )
 
 
         st.session_state.workdays = {
-
             "monday": monday,
-
             "tuesday": tuesday,
-
             "wednesday": wednesday,
-
             "thursday": thursday,
-
             "friday": friday,
-
             "saturday": saturday,
-
             "sunday": sunday
         }
 
 
-        # =================================================
+        # -------------------------------------------------
         # 排除日期
-        # =================================================
+        # -------------------------------------------------
         st.write(
             "### 🏖️ 國定假日 / 排除日期"
-        )
-
-
-        st.caption(
-            "這些日期即使原本是工作日，也不會計入工作天。"
         )
 
 
@@ -2410,7 +3169,8 @@ if uploaded_file is not None:
 
             if (
                 holiday_timestamp
-                not in normalized_holidays
+                not in
+                normalized_holidays
             ):
 
                 st.session_state.holidays.append(
@@ -2428,10 +3188,9 @@ if uploaded_file is not None:
                 )
 
 
-        # =================================================
-        # 顯示排除日期
-        # =================================================
-        if st.session_state.holidays:
+        if (
+            st.session_state.holidays
+        ):
 
             st.write(
                 "#### 目前排除日期"
@@ -2444,7 +3203,10 @@ if uploaded_file is not None:
 
                 col_date, col_delete = (
                     st.columns(
-                        [4, 1]
+                        [
+                            4,
+                            1
+                        ]
                     )
                 )
 
@@ -2484,13 +3246,6 @@ if uploaded_file is not None:
                 st.rerun()
 
 
-        else:
-
-            st.info(
-                "目前沒有設定排除日期。"
-            )
-
-
     # =====================================================
     # weekmask
     # =====================================================
@@ -2509,7 +3264,7 @@ if uploaded_file is not None:
 
 
     # =====================================================
-    # 建立工作連動
+    # 建立連動
     # =====================================================
     st.divider()
 
@@ -2520,7 +3275,11 @@ if uploaded_file is not None:
 
     col1, col2, col3 = (
         st.columns(
-            [2, 2, 1]
+            [
+                2,
+                2,
+                1
+            ]
         )
     )
 
@@ -2559,27 +3318,40 @@ if uploaded_file is not None:
     # =====================================================
     if add_link:
 
-        if start_task == end_task:
+        if (
+            start_task
+            ==
+            end_task
+        ):
 
             st.warning(
                 "開始項目與結束項目不能相同。"
             )
 
-
         else:
 
-            start_task_date = gantt_df.loc[
-                gantt_df["工作項目"]
-                == start_task,
-                "完成期限"
-            ].iloc[0]
+            start_task_date = (
+                gantt_df.loc[
+                    gantt_df[
+                        "工作項目"
+                    ]
+                    ==
+                    start_task,
+                    "完成期限"
+                ].iloc[0]
+            )
 
 
-            end_task_date = gantt_df.loc[
-                gantt_df["工作項目"]
-                == end_task,
-                "完成期限"
-            ].iloc[0]
+            end_task_date = (
+                gantt_df.loc[
+                    gantt_df[
+                        "工作項目"
+                    ]
+                    ==
+                    end_task,
+                    "完成期限"
+                ].iloc[0]
+            )
 
 
             if (
@@ -2593,18 +3365,23 @@ if uploaded_file is not None:
                     "無法建立連動。"
                 )
 
-
             else:
 
                 duplicate = any(
 
-                    link["start"]
-                    == start_task
+                    link[
+                        "start"
+                    ]
+                    ==
+                    start_task
 
                     and
 
-                    link["end"]
-                    == end_task
+                    link[
+                        "end"
+                    ]
+                    ==
+                    end_task
 
                     for link
                     in st.session_state.links
@@ -2616,7 +3393,6 @@ if uploaded_file is not None:
                     st.warning(
                         "這組連動已經存在。"
                     )
-
 
                 else:
 
@@ -2640,9 +3416,11 @@ if uploaded_file is not None:
 
 
     # =====================================================
-    # 目前連動關係
+    # 目前連動
     # =====================================================
-    if st.session_state.links:
+    if (
+        st.session_state.links
+    ):
 
         st.write(
             "### 目前連動關係"
@@ -2652,7 +3430,9 @@ if uploaded_file is not None:
         link_table = []
 
 
-        for link in st.session_state.links:
+        for link in (
+            st.session_state.links
+        ):
 
             start_name = (
                 link["start"]
@@ -2664,14 +3444,20 @@ if uploaded_file is not None:
 
 
             start_rows = gantt_df[
-                gantt_df["工作項目"]
-                == start_name
+                gantt_df[
+                    "工作項目"
+                ]
+                ==
+                start_name
             ]
 
 
             end_rows = gantt_df[
-                gantt_df["工作項目"]
-                == end_name
+                gantt_df[
+                    "工作項目"
+                ]
+                ==
+                end_name
             ]
 
 
@@ -2745,46 +3531,35 @@ if uploaded_file is not None:
 
         if link_table:
 
-            link_df = pd.DataFrame(
-                link_table
-            )
-
-
             st.dataframe(
-                link_df,
+                pd.DataFrame(
+                    link_table
+                ),
                 use_container_width=True,
                 hide_index=True
             )
 
 
-        # =================================================
+        # -------------------------------------------------
         # 刪除連動
-        # =================================================
+        # -------------------------------------------------
         st.write(
             "#### 🗑️ 刪除連動"
         )
 
 
-        link_options = []
-
-
-        for i, link in enumerate(
-            st.session_state.links
-        ):
-
-            label = (
+        link_options = [
+            (
+                i,
                 f"{link['start']}"
                 f" → "
                 f"{link['end']}"
             )
-
-
-            link_options.append(
-                (
-                    i,
-                    label
-                )
+            for i, link
+            in enumerate(
+                st.session_state.links
             )
+        ]
 
 
         selected_link = (
@@ -2827,31 +3602,23 @@ if uploaded_file is not None:
                 st.rerun()
 
 
-    else:
-
-        st.info(
-            "目前尚未建立任何工作連動。"
-        )
-
-
     # =====================================================
     # 甘特圖
     # =====================================================
     st.divider()
 
+
     st.subheader(
-        "📊 網調時程表"
+        f"📊 {project_title}"
     )
 
 
     st.caption(
-        ""
+        "甘特圖上下都有調整日期的水平捲軸；"
+        "工作項目可拖曳分隔線調整欄寬。"
     )
 
 
-    # =====================================================
-    # 建立 HTML 甘特圖
-    # =====================================================
     gantt_html, gantt_height = (
         create_gantt_html(
 
@@ -2868,14 +3635,17 @@ if uploaded_file is not None:
                 weekmask,
 
             holidays=
-                st.session_state.holidays
+                st.session_state.holidays,
+
+            project_title=
+                project_title,
+
+            static_mode=
+                False
         )
     )
 
 
-    # =====================================================
-    # 顯示甘特圖
-    # =====================================================
     components.html(
 
         gantt_html,
@@ -2883,7 +3653,7 @@ if uploaded_file is not None:
         height=(
             gantt_height
             +
-            90
+            190
         ),
 
         scrolling=False
@@ -2891,43 +3661,26 @@ if uploaded_file is not None:
 
 
     # =====================================================
-    # 使用說明
-    # =====================================================
-    st.info(
-        """
-        **甘特圖操作方式**
-
-        - 使用底部的水平捲軸可以調整時間軸。
-        - 可拖曳工作項目欄右側的分隔線調整欄寬。
-        - 黃色菱形代表工作完成期限。
-        - 菱形上方的白色日期為該工作的完成期限。
-        - 藍色線段代表兩個工作項目之間的期間。
-        - 紅色虛線代表今天。
-        """
-    )
-
-
-    # =====================================================
-    # 儲存完整專案
+    # 匯出 / 分享
     # =====================================================
     st.divider()
 
     st.subheader(
-        "💾 儲存完整甘特圖專案"
+        "📤 匯出"
     )
 
 
     st.write(
         """
-        將目前的工作資料、連動關係、
-        排除日期與工作日設定全部儲存成一份 Excel。
-
-        下次重新上傳這份 Excel，
-        即可恢復目前專案。
+        你可以儲存完整專案 Excel，
+        或直接產生靜態 HTML。
         """
     )
 
 
+    # =====================================================
+    # 建立專案 Excel
+    # =====================================================
     project_excel = (
         create_project_excel(
 
@@ -2949,24 +3702,86 @@ if uploaded_file is not None:
     )
 
 
-    st.download_button(
+    # =====================================================
+    # 建立靜態 HTML
+    # =====================================================
+    static_html, _ = (
+        create_gantt_html(
 
-        label=(
-            "⬇️ 下載完整專案 Excel"
-        ),
+            gantt_df=
+                gantt_df,
 
-        data=
-            project_excel,
+            links=
+                st.session_state.links,
 
-        file_name=(
-            "甘特圖專案.xlsx"
-        ),
+            day_mode=
+                day_mode,
 
-        mime=(
-            "application/"
-            "vnd.openxmlformats-officedocument."
-            "spreadsheetml.sheet"
-        ),
+            weekmask=
+                weekmask,
 
-        use_container_width=True
+            holidays=
+                st.session_state.holidays,
+
+            project_title=
+                project_title,
+
+            static_mode=
+                True
+        )
     )
+
+
+    export_col1, export_col2 = (
+        st.columns(2)
+    )
+
+
+    with export_col1:
+
+        st.download_button(
+
+            label=(
+                "⬇️ 下載完整專案 Excel"
+            ),
+
+            data=
+                project_excel,
+
+            file_name=(
+                f"{project_title}_甘特圖專案.xlsx"
+            ),
+
+            mime=(
+                "application/"
+                "vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+
+            use_container_width=True
+        )
+
+
+    with export_col2:
+
+        st.download_button(
+
+            label=(
+                "🌐 下載靜態甘特圖 HTML"
+            ),
+
+            data=
+                static_html.encode(
+                    "utf-8"
+                ),
+
+            file_name=(
+                f"{project_title}_甘特圖.html"
+            ),
+
+            mime=(
+                "text/html"
+            ),
+
+            use_container_width=True
+        )
