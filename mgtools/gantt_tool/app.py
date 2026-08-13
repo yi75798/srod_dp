@@ -25,7 +25,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📅 工作時程甘特圖工具")
+st.title("📅 時程甘特圖製作")
 
 st.write(
     """
